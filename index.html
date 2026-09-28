@@ -139,6 +139,12 @@ mark{background:var(--hl);color:inherit;padding:.02em .16em;border-radius:3px;-w
 .note b{font-weight:600;margin-right:2px}
 .own textarea{display:block;width:100%;border:0;background:transparent;color:var(--ink);font:inherit;font-size:17px;line-height:1.45;padding:0;resize:none;outline:none;min-height:48px}
 .own textarea::placeholder{color:var(--ink-3)}
+.install{margin-bottom:14px}
+.install-row{display:flex;align-items:center;gap:12px}
+.app-icon{width:48px;height:48px;border-radius:11px}
+.install-text{flex:1;min-width:0}
+.install-text h3{margin:0 0 2px;font-size:16px}
+.install-x{appearance:none;border:0;background:none;color:var(--ink-3);font-size:22px;line-height:1;cursor:pointer;padding:4px;align-self:flex-start}
 .tip{margin:10px 4px 0;padding:10px 14px;border-radius:12px;background:var(--fill-2);color:var(--ink-2);font-size:15px}
 .tip b{color:var(--ink);font-weight:600}
 
@@ -274,6 +280,18 @@ mark{background:var(--hl);color:inherit;padding:.02em .16em;border-radius:3px;-w
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div id="install" class="group install" hidden>
+        <div class="row install-row">
+          <div class="boogey app-icon" aria-hidden="true"></div>
+          <div class="install-text">
+            <h3>Put me on your home screen</h3>
+            <p id="install-how" class="secondary"></p>
+          </div>
+          <button type="button" id="install-btn" class="pill" hidden>Install</button>
+          <button type="button" id="install-x" class="install-x" aria-label="Hide this">&times;</button>
         </div>
       </div>
 
@@ -1156,6 +1174,27 @@ mark{background:var(--hl);color:inherit;padding:.02em .16em;border-radius:3px;-w
     toast("Back to the Boogeyman");
   }
 
+  /* ---------- home-screen app (public page only) ---------- */
+  var installEvt = null;
+  function isInstalled() {
+    try { return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true; } catch (e) { return false; }
+  }
+  function showInstall(how, withButton) {
+    if (!isPublic || isInstalled() || load("tb2.installHidden", false)) return;
+    $("install-how").textContent = how;
+    $("install-btn").hidden = !withButton;
+    $("install").hidden = false;
+  }
+  function setupInstall() {
+    if ("serviceWorker" in navigator && location.protocol === "https:") {
+      navigator.serviceWorker.register("sw.js").catch(function () { /* optional */ });
+    }
+    var ua = navigator.userAgent || "";
+    var isIOS = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && "ontouchend" in document);
+    if (installEvt) showInstall("One tap and I'm an app on your phone.", true);
+    else if (isIOS) showInstall("Tap Share (the square with the arrow), then Add to Home Screen.", false);
+  }
+
   /* ---------- where it runs ---------- */
   // In Claude, the Check tab checks right here. Anywhere else (her phone),
   // the checking happens in her own ChatGPT, so the tab points there instead.
@@ -1164,6 +1203,7 @@ mark{background:var(--hl);color:inherit;padding:.02em .16em;border-radius:3px;-w
     $("checker").hidden = true;
     $("gpt").hidden = false;
     renderList();
+    setupInstall();
   }
 
   /* ---------- wiring ---------- */
@@ -1224,6 +1264,19 @@ mark{background:var(--hl);color:inherit;padding:.02em .16em;border-radius:3px;-w
         else toast("Couldn't copy on this device");
       });
     });
+
+    window.addEventListener("beforeinstallprompt", function (e) {
+      e.preventDefault();
+      installEvt = e;
+      showInstall("One tap and I'm an app on your phone.", true);
+    });
+    window.addEventListener("appinstalled", function () { $("install").hidden = true; });
+    $("install-btn").addEventListener("click", function () {
+      if (!installEvt) return;
+      installEvt.prompt();
+      installEvt.userChoice.then(function () { installEvt = null; $("install").hidden = true; }, function () { /* ignore */ });
+    });
+    $("install-x").addEventListener("click", function () { $("install").hidden = true; save("tb2.installHidden", true); });
 
     $("face-btn").addEventListener("click", openSheet);
     $("face-file").addEventListener("change", function () {
