@@ -1,7 +1,7 @@
 // Truth Boogeyman service worker: lets the page install as a home-screen app and
 // open without a connection. Network first, so she always gets the newest version
 // when online; the cached copy is only a fallback.
-var CACHE = "tb-v1";
+var CACHE = "tb-v2";
 var SHELL = ["./", "./index.html", "./manifest.webmanifest", "./apple-touch-icon.png", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", function (e) {

@@ -131,12 +131,16 @@ mark{background:var(--hl);color:inherit;padding:.02em .16em;border-radius:3px;-w
 .meter-track{height:6px;border-radius:3px;background:var(--fill);overflow:hidden}
 .meter-fill{height:100%;border-radius:3px;width:0;transition:width .5s ease}
 .meter-label{display:block;margin-top:6px;font-size:13px;color:var(--ink-2)}
-.none-row{color:var(--green);font-size:15px}
 .reply p{font-size:17px;white-space:pre-wrap}
 .reply .actions,.own .actions{justify-content:flex-end;margin-top:10px}
 .own{margin-top:12px}
 .note{margin-top:8px!important;font-size:14px;line-height:1.4;color:var(--ink-2)}
+.boo-notes{margin:6px 0 0 38px;max-width:420px}
+.boo-notes .note{margin:4px 0 0!important}
 .note b{font-weight:600;margin-right:2px}
+.check-line{margin:0 16px 8px!important}
+.check-line b{color:var(--green)}
+.check-line.warn b{color:var(--ink)}
 .own textarea{display:block;width:100%;border:0;background:transparent;color:var(--ink);font:inherit;font-size:17px;line-height:1.45;padding:0;resize:none;outline:none;min-height:48px}
 .own textarea::placeholder{color:var(--ink-3)}
 .install{margin-bottom:14px}
@@ -264,6 +268,10 @@ mark{background:var(--hl);color:inherit;padding:.02em .16em;border-radius:3px;-w
               <div class="meter-track" aria-hidden="true"><div class="meter-fill" id="meter-fill"></div></div>
               <span class="meter-label" id="meter-label"></span>
             </div>
+            <div id="boo-notes" class="boo-notes" hidden>
+              <p id="under-line" class="note" hidden></p>
+              <p id="worth-line" class="note" hidden></p>
+            </div>
           </div>
           <div id="fallacies-block" hidden>
             <h2 class="section-head">Fallacies</h2>
@@ -271,6 +279,7 @@ mark{background:var(--hl);color:inherit;padding:.02em .16em;border-radius:3px;-w
           </div>
           <div id="replies-block" hidden>
             <h2 class="section-head">Replies</h2>
+            <p id="check-line" class="note check-line" hidden></p>
             <div id="replies" class="group"></div>
             <div class="group own">
               <div class="row">
@@ -477,13 +486,17 @@ mark{background:var(--hl);color:inherit;padding:.02em .16em;border-radius:3px;-w
 
   var EXAMPLE = {
     input: "Sunscreen causes cancer. It's full of chemicals. My grandma never wore a drop and lived to 98. Wake up people.",
-    boo: "Three sneaky moves in four sentences. Grandma would still want you wearing sunscreen.",
-    meter: 7,
+    boo: "It says sunscreen causes cancer, but its only support is \"chemicals are bad\" and one grandma's long life, and neither shows that.",
+    meter: 8,
+    under: "They're uneasy about what goes on their skin, and a family story feels more trustworthy than a study.",
+    worth: "reply",
+    worthWhy: "People reading may be unsure, and a calm answer with an easy swap helps them.",
     fallacies: [
       { name: "Appeal to nature", quote: "It's full of chemicals.", what: "Treating natural as automatically good and 'chemical' as automatically bad.", why: "Everything is made of chemicals, water included. What matters is which ingredient and what the evidence shows." },
-      { name: "Anecdote over evidence", quote: "My grandma never wore a drop and lived to 98.", what: "Letting one personal story outweigh evidence gathered from many people.", why: "One long, lucky life can't show the odds for everyone." },
-      { name: "Fear and outrage", quote: "Wake up people.", what: "Using alarm or anger to make a claim feel urgent, in place of evidence.", why: "It makes doubting the claim feel naive instead of giving any evidence." }
+      { name: "Anecdote over evidence", quote: "My grandma never wore a drop and lived to 98.", what: "Letting one personal story outweigh evidence gathered from many people.", why: "One long, lucky life can't show the odds for everyone." }
     ],
+    check: "Sunscreen lowering skin cancer risk is well established, and the 2021 spray recalls were real, so every fact here holds up.",
+    checkOk: true,
     none: "",
     replies: [
       { style: "ask", text: "Honest question: is it the chemical ingredients that worry you, or sunscreen in general? Mineral ones like zinc skip most of what people worry about.", note: "Asking which ingredient turns a vague 'chemicals' scare into something specific you can actually talk about, and the zinc tip gives them an easy out." },
@@ -621,27 +634,35 @@ mark{background:var(--hl);color:inherit;padding:.02em .16em;border-radius:3px;-w
   /* ---------- prompts ---------- */
   function buildPrompt(text, hasImage) {
     var p = [];
-    p.push("You are the engine inside a playful app called " + (appName || "Truth Boogeyman") + ". Its host is a goofy, good-natured character who scares off bad arguments, not people. The user pastes something they disagree with (an online comment, a text message, an email, or a screenshot of one), and you help them answer it. They decide what to send.");
+    p.push("You are the engine inside an app called " + (appName || "Truth Boogeyman") + ". It scares off bad arguments, not people: it helps the user see clearly what a comment is doing and answer it well. The user pastes something they disagree with (an online comment, a text message, an email, or a screenshot of one). They decide what to send, so everything you tell them must be right.");
     p.push("");
     p.push("THE COMMENT");
     if (text) p.push("\"\"\"\n" + clip(text, 6000) + "\n\"\"\"");
     if (hasImage) p.push("They attached a screenshot of the thread. Read it closely. Answer the comment they most likely want to reply to: the latest one that isn't theirs, unless their text says otherwise. Quote exact words from it.");
     p.push("");
     p.push("DO THREE THINGS");
-    p.push("1. React as the Boogeyman in one short, playful line about this comment: funny, never mean, no insults. Then rate it on the Nonsense-o-meter from 0 (perfectly fair) to 10 (pure nonsense).");
-    p.push("2. Name the logical fallacies that are really in the comment, 0 to 3, strongest first. For each: its common name, the commenter's exact words, what the fallacy is in one friendly sentence someone could paste to make people aware, and one plain sentence on why it doesn't hold up here. Hold every side to the same standard. If there are none, say so in one sentence. Never invent one. Most comments have one main move: add a second or third only when it is clearly a different move, and never stretch a label to fit.");
-    p.push("3. Write four replies the user could post, each a different approach:");
+    p.push("1. Sum up in one plain sentence, 30 words at most, what the comment claims and where its support falls short, specific to this comment, so a smart reader gets it at a glance. If part of it is fair, say which part. If there's no clear fallacy, start with \"No clear fallacy\" and say whether it's a fair point or a claim that's simply false. Serious and clear: no jokes, and no vague words like sneaky or fishy.");
+    p.push("   Then rate it on the Nonsense-o-meter: 0 to 1 a fair point, 2 to 3 mostly fair with a small slip, 4 to 6 half right (a real point with a real flaw), 7 to 8 mostly doesn't hold up, 9 to 10 doesn't hold up at all.");
+    p.push("   Then two short notes for the user only: where they're coming from (the worry, value, or feeling underneath the comment, in plain words), and whether it's worth answering: reply, maybe, or skip (skip when it's bait, bad faith, or a fight nobody wins), with a few words on why.");
+    p.push("2. Name the fallacies clearly in the comment: the main move first, then at most one more, only if it's clearly a separate move that matters. Leave out anything that's a judgment call: a wrong label is worse than a missing one. For each: its common name, the commenter's exact words, what the fallacy is in one friendly sentence someone could paste to make people aware, and one plain sentence on why it doesn't hold up here. Hold every side to the same standard. If there's no clear fallacy, say so in one sentence.");
+    p.push("3. Write four replies the user could post, each a different approach, all aimed at the main move or the one claim that matters most:");
     p.push("   ask: a genuine question that shows the gap.");
     p.push("   correct: say plainly what's true and why the claim doesn't hold up.");
     p.push("   common: start from something they both care about, then make the point.");
     p.push("   funny: light and funny, never mean or sarcastic at the person, and it still makes the point.");
     if (myStyle.name && myStyle.desc) p.push("   mine: one more reply in the user's own style, which they call \"" + clip(myStyle.name, 60) + "\": " + clip(myStyle.desc, 300));
-    p.push("   If the comment has no fallacy, the replies should engage kindly: agree where you can, add something useful, or ask. Don't argue with a fair point.");
+    p.push("   If the comment is fair (no clear fallacy and nothing false), the replies should engage kindly: agree where you can, add something useful, or ask. Don't argue with a fair point.");
     p.push("   For each reply also write a note for the user only, never to be posted: one sentence on the strategy, what the reply does and why it works against this particular comment. Like a coach's aside. You may name the fallacy in the note.");
     p.push("");
+    p.push("BEFORE YOU ANSWER, CHECK YOUR WORK");
+    p.push("- Every fallacy is really there in their exact words, not a stretch.");
+    p.push("- Every fact in a reply is well established and stated no stronger than the evidence.");
+    p.push("- Every reply makes sense to a stranger reading it cold, and the funny one actually lands.");
+    p.push("- Nothing misreads sarcasm, a joke, or who is speaking.");
+    p.push("Fix or drop anything that fails. Then tell the user in one sentence what you checked, or what to be careful about.");
+    p.push("");
     p.push("HOW THE REPLIES MUST SOUND");
-    p.push("- The Boogeyman voice is only for the reaction line. Replies are in the user's own voice.");
-    p.push("- Like a real person typing on their phone. Not like AI.");
+    p.push("- In the user's own voice, like a real person typing on their phone. Not like AI.");
     p.push("- Public thread: write so the people reading along can see the point. Private message (a text, DM, or email): there's no audience, so write for that one person and keep the relationship in mind.");
     p.push("- 1 to 3 short sentences, under 60 words.");
     p.push("- Never name the fallacy in a reply. Show the flaw in plain words.");
@@ -660,14 +681,15 @@ mark{background:var(--hl);color:inherit;padding:.02em .16em;border-radius:3px;-w
     p.push("");
     p.push("OUTPUT");
     p.push("JSON Lines only: one JSON object per line, no other text, no code fences. Keep each object on one line. In this order:");
-    p.push('{"t":"boo","text":"one playful line","meter":7}');
-    p.push('{"t":"fallacy","name":"...","quote":"exact words","what":"one friendly sentence","why":"one sentence"}');
-    p.push('{"t":"none","why":"one sentence"}   (only when there are no fallacies)');
+    p.push('{"t":"boo","text":"the one-sentence sum-up","meter":7,"under":"where they are coming from, one short sentence","worth":"reply","worth_why":"a few words"}');
+    p.push('{"t":"fallacy","name":"...","quote":"exact words","what":"one friendly sentence","why":"one sentence"}   (the main move, then at most one more)');
+    p.push('{"t":"none","why":"one sentence"}   (only when there is no clear fallacy)');
     p.push('{"t":"reply","style":"ask","text":"...","note":"one sentence for the user only"}');
     p.push('{"t":"reply","style":"correct","text":"...","note":"..."}');
     p.push('{"t":"reply","style":"common","text":"...","note":"..."}');
     p.push('{"t":"reply","style":"funny","text":"...","note":"..."}');
     if (myStyle.name && myStyle.desc) p.push('{"t":"reply","style":"mine","text":"...","note":"..."}');
+    p.push('{"t":"check","ok":true,"text":"one sentence: what you checked, or what to be careful about"}   (ok is false when there is something to be careful about)');
     return p.join("\n");
   }
 
@@ -677,23 +699,27 @@ mark{background:var(--hl);color:inherit;padding:.02em .16em;border-radius:3px;-w
     var name = appName || "the Truth Boogeyman";
     var hasMine = !!(myStyle.name && myStyle.desc);
     var lines = [
-      "You are " + name + ": a goofy, good-natured character who scares off bad arguments, not people. When I paste a comment, a text message, or a screenshot of either, help me answer it. If it's a private text or DM, write for that one person and keep the relationship in mind. If it's a public thread, write so the people reading along see the point.",
+      "You are " + name + ". You scare off bad arguments, not people: you help me see clearly what a comment is doing and answer it well. When I paste a comment, a text message, or a screenshot of either, help me answer it. If it's a private text or DM, write for that one person and keep the relationship in mind. If it's a public thread, write so the people reading along see the point. I decide what to send, so everything you tell me must be right.",
       "",
-      "Start with one short, playful line in that character's voice about the comment (funny, never mean). Then \"Nonsense-o-meter: X/10\" (0 is perfectly fair, 10 is pure nonsense).",
+      "Start with one plain sentence, 30 words at most, on what the comment claims and where its support falls short, specific to this comment, so I get it at a glance. If part of it is fair, say which part. If there's no clear fallacy, start with \"No clear fallacy\" and say whether it's a fair point or a claim that's simply false. Serious and clear: no jokes, and no vague words like sneaky or fishy.",
+      "Then \"Nonsense-o-meter: X/10\" and what that means: 0-1 a fair point, 2-3 mostly fair, 4-6 half right, 7-8 mostly doesn't hold up, 9-10 doesn't hold up at all.",
+      "Then two short lines for me: \"Where they're coming from:\" the worry or feeling underneath the comment, and \"Worth it:\" reply, maybe, or skip (skip when it's bait or a fight nobody wins), with a few words why.",
       "",
-      "FALLACIES: the logical fallacies really in the comment, 0 to 3, strongest first. For each give: the name; the exact words, quoted; what it is, in one friendly sentence I could paste to make people aware; and why it doesn't hold up here, in one sentence. If there are none, say it's an opinion I can simply disagree with. Never invent one. Most comments have one main move; add more only when they're clearly different, and never stretch a label to fit. Hold every side to the same standard.",
+      "FALLACIES: only the ones clearly in the comment. The main move first, then at most one more if it's clearly a separate move that matters. Leave out judgment calls: a wrong label is worse than a missing one. For each give: the name; the exact words, quoted; what it is, in one friendly sentence I could paste to make people aware; and why it doesn't hold up here, in one sentence. If there's none, just write \"No clear fallacy.\" Hold every side to the same standard.",
       "",
-      "REPLIES: " + (hasMine ? "five" : "four") + " short replies I could post:",
+      "REPLIES: " + (hasMine ? "five" : "four") + " short replies I could post, all aimed at the main move or the one claim that matters most:",
       "1. Ask: a genuine question that shows the gap",
       "2. Set it straight: what's true, and why the claim doesn't hold",
       "3. Common ground: start from something we both care about, then make the point",
       "4. Make 'em laugh: light and funny, never mean, still makes the point"
     ];
     if (hasMine) lines.push("5. " + myStyle.name + ": " + myStyle.desc);
-    lines.push("If the comment has no fallacy, the replies should engage kindly instead of arguing.");
+    lines.push("If the comment is fair, the replies should engage kindly instead of arguing.");
     lines.push("Under each reply, add one short line starting with \"Why it works:\" that explains the strategy, what the reply does and why it lands against this comment. That line is for me, not to post.");
     lines.push("");
-    lines.push("The character's voice is only for the opening line. The replies must sound like me, not like AI: use what you know about how I write and talk. 1 to 3 short sentences each. Never name the fallacy inside a reply. Never use \"Great point\", \"It's important to note\", \"I understand your concern\", hashtags, or em dashes. No lecturing, insults, or sarcasm aimed at the person. Only use facts you're sure are well established. If you're not sure, ask a question instead. When there are several claims, answer the one or two you're surest about. If the topic touches someone's pain (an illness, a child's diagnosis, a death), keep the funny reply gentle and never joke about the pain itself.");
+    lines.push("Before you answer, check your work: every fallacy is really in their exact words, not a stretch; every fact is well established and not overstated; each reply makes sense to a stranger reading it cold, and the funny one lands; nothing misreads sarcasm or who is speaking. Fix or drop anything that fails. End with one line: \"Checked:\" and what you verified, or \"Heads up:\" and what I should be careful about.");
+    lines.push("");
+    lines.push("The replies must sound like me, not like AI: use what you know about how I write and talk. 1 to 3 short sentences each. Never name the fallacy inside a reply. Never use \"Great point\", \"It's important to note\", \"I understand your concern\", \"Let's\", hashtags, or em dashes. No lecturing, insults, or sarcasm aimed at the person. Only use facts you're sure are well established. If you're not sure, ask a question instead. When there are several claims, answer the one or two you're surest about. If the topic touches someone's pain (an illness, a child's diagnosis, a death), keep the funny reply gentle and never joke about the pain itself.");
     if (tone) {
       lines.push("");
       lines.push("HOW I WRITE, in my own words: " + tone);
@@ -739,25 +765,30 @@ mark{background:var(--hl);color:inherit;padding:.02em .16em;border-radius:3px;-w
     if (!o || typeof o !== "object") return [];
     if (o.t) return [o];
     var list = [];
-    if (o.boo || o.meter != null) list.push({ t: "boo", text: o.boo || o.reaction || "", meter: o.meter });
+    if (o.boo || o.meter != null) list.push({ t: "boo", text: o.boo || o.reaction || "", meter: o.meter, under: o.under, worth: o.worth, worth_why: o.worth_why });
     (Array.isArray(o.fallacies) ? o.fallacies : []).forEach(function (x) { list.push({ t: "fallacy", name: x.name, quote: x.quote, what: x.what, why: x.why }); });
-    (Array.isArray(o.replies) ? o.replies : []).forEach(function (x) { list.push({ t: "reply", style: x.style, text: x.text }); });
+    (Array.isArray(o.replies) ? o.replies : []).forEach(function (x) { list.push({ t: "reply", style: x.style, text: x.text, note: x.note }); });
     if (o.none) list.push({ t: "none", why: typeof o.none === "string" ? o.none : o.why });
+    if (o.check) list.push(typeof o.check === "object" ? { t: "check", ok: o.check.ok, text: o.check.text } : { t: "check", ok: o.ok, text: o.check });
     return list;
   }
 
   /* ---------- rendering the check ---------- */
+  // Words that say what the number means, same bands the prompt scores against.
   function meterLabel(n) {
-    if (n <= 2) return "Mostly fair";
-    if (n <= 4) return "A little spooky";
-    if (n <= 7) return "Pretty spooky";
-    return "Full Boogeyman";
+    if (n <= 1) return "A fair point";
+    if (n <= 3) return "Mostly fair";
+    if (n <= 6) return "Half right";
+    if (n <= 8) return "Mostly doesn't hold up";
+    return "Doesn't hold up";
   }
   function clearResults() {
     $("results").hidden = true;
     $("example-note").hidden = true;
     $("boo").hidden = true;
     $("meter").hidden = true;
+    $("boo-notes").hidden = true;
+    $("check-line").hidden = true;
     $("fallacies").textContent = "";
     $("replies").textContent = "";
     $("fallacies-block").hidden = true;
@@ -779,10 +810,40 @@ mark{background:var(--hl);color:inherit;padding:.02em .16em;border-radius:3px;-w
       fill.style.width = (m * 10) + "%";
     }
   }
+  // Two quiet lines under the Boogeyman: the feeling behind the comment, and
+  // whether it's worth answering. Hidden when a result doesn't have them.
+  var WORTH = { reply: "Worth a reply", maybe: "Your call", skip: "Skip it" };
+  function normWorth(v) {
+    v = str(v).toLowerCase();
+    return WORTH[v] ? v : "";
+  }
+  function noteLine(node, label, text) {
+    node.textContent = "";
+    node.appendChild(el("b", null, label + " "));
+    node.appendChild(document.createTextNode(text));
+    node.hidden = false;
+  }
+  function showBooNotes() {
+    var u = $("under-line"), w = $("worth-line");
+    u.hidden = true; w.hidden = true;
+    if (result && result.under) noteLine(u, "Where they're coming from", result.under);
+    if (result && result.worth) noteLine(w, WORTH[result.worth], result.worthWhy || "");
+    $("boo-notes").hidden = u.hidden && w.hidden;
+  }
+  // The model's own double-check, just above the replies she might copy.
+  function showCheck() {
+    var c = $("check-line");
+    c.hidden = true;
+    c.classList.remove("warn");
+    if (!result || !result.check) return;
+    noteLine(c, result.checkOk ? "\u2713 Checked" : "Heads up", result.check);
+    if (!result.checkOk) c.classList.add("warn");
+  }
   function addFallacy(f) {
     $("results").hidden = false;
     $("fallacies-block").hidden = false;
     var row = el("div", "row");
+    row.appendChild(el("span", "caption", $("fallacies").children.length ? "Also" : "Main move"));
     row.appendChild(el("h3", null, f.name));
     if (f.quote) {
       var q = el("p", "secondary");
@@ -804,7 +865,8 @@ mark{background:var(--hl);color:inherit;padding:.02em .16em;border-radius:3px;-w
     $("results").hidden = false;
     $("fallacies-block").hidden = false;
     var row = el("div", "row");
-    row.appendChild(el("p", "none-row", why || "No fallacies here. It's an opinion you can simply disagree with."));
+    row.appendChild(el("h3", null, "No clear fallacy"));
+    row.appendChild(el("p", "secondary", why || "It's an opinion you can simply disagree with."));
     $("fallacies").appendChild(row);
   }
   function addReply(r) {
@@ -831,29 +893,43 @@ mark{background:var(--hl);color:inherit;padding:.02em .16em;border-radius:3px;-w
     $("results").hidden = false;
     $("example-note").hidden = !isExample;
     if (result.boo || result.meter != null) showBoo(result.boo, result.meter);
-    result.fallacies.forEach(addFallacy);
+    showBooNotes();
+    result.fallacies.slice(0, 2).forEach(addFallacy);
     if (!result.fallacies.length && result.none) addNone(result.none);
     result.replies.forEach(addReply);
+    showCheck();
   }
   function apply(o) {
     var t = str(o.t).toLowerCase();
     if (t === "boo") {
       result.boo = str(o.text);
       result.meter = (o.meter == null || o.meter === "") ? null : Number(o.meter);
+      result.under = str(o.under);
+      result.worth = normWorth(o.worth);
+      result.worthWhy = str(o.worth_why || o.worthWhy);
       showBoo(result.boo, result.meter);
+      showBooNotes();
       return true;
     }
     if (t === "fallacy") {
       var f = { name: str(o.name), quote: str(o.quote), what: str(o.what), why: str(o.why) };
-      if (!f.name || result.fallacies.length >= 4) return false;
+      if (!f.name || result.fallacies.length >= 2) return false;
       result.fallacies.push(f);
       addFallacy(f);
       return true;
     }
     if (t === "none") {
       if (result.fallacies.length || result.none) return false;
-      result.none = str(o.why) || "No fallacies here.";
+      result.none = str(o.why) || "It's an opinion you can simply disagree with.";
       addNone(result.none);
+      return true;
+    }
+    if (t === "check") {
+      var ct = str(o.text);
+      if (!ct) return false;
+      result.check = ct;
+      result.checkOk = !(o.ok === false || str(o.ok).toLowerCase() === "false");
+      showCheck();
       return true;
     }
     if (t === "reply") {
@@ -909,7 +985,7 @@ mark{background:var(--hl);color:inherit;padding:.02em .16em;border-radius:3px;-w
     if (ctl) ctl.abort();
     var c = ctl = new AbortController();
     isExample = false;
-    result = { input: text, boo: "", meter: null, fallacies: [], none: "", replies: [] };
+    result = { input: text, boo: "", meter: null, under: "", worth: "", worthWhy: "", fallacies: [], none: "", replies: [], check: "", checkOk: true };
     clearResults();
     setWorking(true);
     var buf = "", carry = "", parsed = 0;
@@ -1308,12 +1384,14 @@ mark{background:var(--hl);color:inherit;padding:.02em .16em;border-radius:3px;-w
     if (last && typeof last === "object" && Array.isArray(last.replies) && last.replies.length) {
       result = {
         input: str(last.input), boo: str(last.boo), meter: last.meter == null ? null : Number(last.meter),
-        fallacies: Array.isArray(last.fallacies) ? last.fallacies : [], none: str(last.none), replies: last.replies
+        under: str(last.under), worth: normWorth(last.worth), worthWhy: str(last.worthWhy),
+        fallacies: Array.isArray(last.fallacies) ? last.fallacies : [], none: str(last.none), replies: last.replies,
+        check: str(last.check), checkOk: last.checkOk !== false
       };
       isExample = false;
       $("input").value = result.input;
     } else {
-      result = { input: EXAMPLE.input, boo: EXAMPLE.boo, meter: EXAMPLE.meter, fallacies: EXAMPLE.fallacies.slice(), none: "", replies: EXAMPLE.replies.slice() };
+      result = { input: EXAMPLE.input, boo: EXAMPLE.boo, meter: EXAMPLE.meter, under: EXAMPLE.under, worth: EXAMPLE.worth, worthWhy: EXAMPLE.worthWhy, fallacies: EXAMPLE.fallacies.slice(), none: "", replies: EXAMPLE.replies.slice(), check: EXAMPLE.check, checkOk: EXAMPLE.checkOk };
       isExample = true;
       $("input").value = EXAMPLE.input;
     }
