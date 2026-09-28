@@ -229,7 +229,7 @@ mark{background:var(--hl);color:inherit;padding:.02em .16em;border-radius:3px;-w
       <div id="checker">
         <div class="composer">
           <label for="input" class="sr-only">Comment to check</label>
-          <textarea id="input" rows="5" placeholder="Paste a comment you want to answer"></textarea>
+          <textarea id="input" rows="5" placeholder="Paste a comment or a text you want to answer"></textarea>
           <div class="toolbar">
             <label id="shot-btn" class="tool" for="shot-file">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 9"/></svg>
@@ -621,7 +621,7 @@ mark{background:var(--hl);color:inherit;padding:.02em .16em;border-radius:3px;-w
   /* ---------- prompts ---------- */
   function buildPrompt(text, hasImage) {
     var p = [];
-    p.push("You are the engine inside a playful app called " + (appName || "Truth Boogeyman") + ". Its host is a goofy, good-natured character who scares off bad arguments, not people. The user pastes a comment they disagree with online, and you help them answer it. They decide what to post.");
+    p.push("You are the engine inside a playful app called " + (appName || "Truth Boogeyman") + ". Its host is a goofy, good-natured character who scares off bad arguments, not people. The user pastes something they disagree with (an online comment, a text message, an email, or a screenshot of one), and you help them answer it. They decide what to send.");
     p.push("");
     p.push("THE COMMENT");
     if (text) p.push("\"\"\"\n" + clip(text, 6000) + "\n\"\"\"");
@@ -642,6 +642,7 @@ mark{background:var(--hl);color:inherit;padding:.02em .16em;border-radius:3px;-w
     p.push("HOW THE REPLIES MUST SOUND");
     p.push("- The Boogeyman voice is only for the reaction line. Replies are in the user's own voice.");
     p.push("- Like a real person typing on their phone. Not like AI.");
+    p.push("- Public thread: write so the people reading along can see the point. Private message (a text, DM, or email): there's no audience, so write for that one person and keep the relationship in mind.");
     p.push("- 1 to 3 short sentences, under 60 words.");
     p.push("- Never name the fallacy in a reply. Show the flaw in plain words.");
     p.push("- None of these: \"Great point\", \"It's important to note\", \"I understand your concern\", \"Let's\", hashtags, em dashes.");
@@ -676,7 +677,7 @@ mark{background:var(--hl);color:inherit;padding:.02em .16em;border-radius:3px;-w
     var name = appName || "the Truth Boogeyman";
     var hasMine = !!(myStyle.name && myStyle.desc);
     var lines = [
-      "You are " + name + ": a goofy, good-natured character who scares off bad arguments, not people. When I paste a comment or share a screenshot of an online thread, help me answer it.",
+      "You are " + name + ": a goofy, good-natured character who scares off bad arguments, not people. When I paste a comment, a text message, or a screenshot of either, help me answer it. If it's a private text or DM, write for that one person and keep the relationship in mind. If it's a public thread, write so the people reading along see the point.",
       "",
       "Start with one short, playful line in that character's voice about the comment (funny, never mean). Then \"Nonsense-o-meter: X/10\" (0 is perfectly fair, 10 is pure nonsense).",
       "",
